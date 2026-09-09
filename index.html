@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+<meta name="theme-color" content="#050505" />
+<title>3D SCANNER — 48 View Capture</title>
+<style>
+:root{
+  --bg:#050505;
+  --fg:#f5f5f5;
+  --muted:#8d8d8d;
+  --line:rgba(255,255,255,.22);
+  --panel:rgba(0,0,0,.52);
+  --accent:#fff;
+  --danger:#ff5d5d;
+  --ok:#80ff9b;
+}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;background:var(--bg);color:var(--fg);font-family:Arial,Helvetica,sans-serif;overflow:hidden}
+button{font:inherit}
+#app{position:fixed;inset:0;background:#000}
+video{
+  position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#111;
+}
+#flash{
+  position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:30;
+}
+#flash.on{animation:flash .18s ease-out}
+@keyframes flash{0%{opacity:.85}100%{opacity:0}}
+
+.topbar{
+  position:absolute;top:0;left:0;right:0;z-index:20;
+  padding:calc(14px + env(safe-area-inset-top)) 16px 12px;
+  display:flex;justify-content:space-between;align-items:flex-start;
+  background:linear-gradient(to bottom,rgba(0,0,0,.78),rgba(0,0,0,0));
+  pointer-events:none;
+}
+.brand{font-size:13px;font-weight:700;letter-spacing:.16em}
+.sub{font-size:10px;color:#bbb;margin-top:3px;letter-spacing:.08em}
+.status{
+  text-align:right;font-size:10px;letter-spacing:.08em;color:#bbb;
+}
+.status b{display:block;color:#fff;font-size:18px;letter-spacing:0}
+
+.overlay{position:absolute;inset:0;z-index:10;pointer-events:none}
+.target{
+  position:absolute;left:50%;top:47%;transform:translate(-50%,-50%);
+  width:min(72vw,370px);aspect-ratio:1/1;
+  border:1px solid rgba(255,255,255,.65);
+  border-radius:50%;
+  box-shadow:0 0 0 9999px rgba(0,0,0,.12);
+}
+.target:before,.target:after{
+  content:"";position:absolute;left:50%;top:50%;background:rgba(255,255,255,.4);
+  transform:translate(-50%,-50%)
+}
+.target:before{width:28px;height:1px}
+.target:after{width:1px;height:28px}
+
+.ring{
+  position:absolute;left:50%;top:47%;transform:translate(-50%,-50%);
+  width:min(88vw,450px);aspect-ratio:1/1;
+}
+.dot{
+  position:absolute;left:50%;top:50%;width:6px;height:6px;
+  margin:-3px;border-radius:50%;background:rgba(255,255,255,.25);
+  transform-origin:3px 3px;
+}
+.dot.done{background:#fff;box-shadow:0 0 8px rgba(255,255,255,.8)}
+.dot.next{width:10px;height:10px;margin:-5px;background:#fff;box-shadow:0 0 14px rgba(255,255,255,1)}
+
+.guide{
+  position:absolute;left:50%;top:calc(47% + min(48vw,225px));
+  transform:translate(-50%,14px);
+  width:90%;text-align:center;
+  font-weight:700;font-size:12px;letter-spacing:.12em;text-shadow:0 1px 4px #000;
+}
+.guide span{display:block;color:#bdbdbd;font-size:10px;font-weight:400;margin-top:5px;letter-spacing:.06em}
+
+.headingBadge{
+  position:absolute;left:16px;top:calc(68px + env(safe-area-inset-top));
+  padding:8px 10px;border:1px solid var(--line);border-radius:10px;
+  background:var(--panel);backdrop-filter:blur(10px);font-size:10px;color:#bbb;
+}
+.headingBadge b{color:#fff;font-size:14px}
+
+.controls{
+  position:absolute;z-index:25;left:0;right:0;bottom:0;
+  padding:12px 14px calc(16px + env(safe-area-inset-bottom));
+  background:linear-gradient(to top,rgba(0,0,0,.92),rgba(0,0,0,.36),rgba(0,0,0,0));
+}
+.modeRow{display:flex;gap:8px;justify-content:center;margin-bottom:12px}
+.pill{
+  border:1px solid var(--line);background:rgba(0,0,0,.48);color:#ddd;
+  padding:8px 11px;border-radius:999px;font-size:10px;letter-spacing:.05em;
+}
+.pill.active{background:#fff;color:#000;border-color:#fff}
+.mainRow{display:grid;grid-template-columns:1fr 92px 1fr;align-items:center;gap:12px}
+.smallBtn{
+  border:1px solid var(--line);background:rgba(0,0,0,.5);color:#fff;
+  border-radius:14px;padding:12px 8px;font-size:11px;
+}
+.captureWrap{display:flex;justify-content:center}
+.capture{
+  width:78px;height:78px;border-radius:50%;border:4px solid white;
+  background:transparent;padding:6px;display:grid;place-items:center;
+}
+.capture:after{content:"";display:block;width:58px;height:58px;border-radius:50%;background:#fff}
+.capture:active:after{transform:scale(.88)}
+.capture:disabled{opacity:.35}
+.capture:disabled:after{background:#777}
+
+.progressBox{
+  margin-top:12px;border-top:1px solid rgba(255,255,255,.14);padding-top:10px;
+  display:flex;align-items:center;gap:10px
+}
+.progressTrack{height:3px;background:rgba(255,255,255,.15);flex:1;border-radius:99px;overflow:hidden}
+.progressFill{height:100%;background:#fff;width:0%}
+.progressText{font-size:10px;color:#bbb;min-width:76px;text-align:right}
+
+.sheet{
+  position:absolute;z-index:40;inset:0;background:rgba(0,0,0,.86);
+  display:none;align-items:flex-end;
+}
+.sheet.open{display:flex}
+.sheetCard{
+  width:100%;max-height:88vh;overflow:auto;background:#101010;border-radius:22px 22px 0 0;
+  padding:20px 16px calc(24px + env(safe-area-inset-bottom));
+}
+.sheet h2{font-size:18px;margin:0 0 6px}
+.sheet p{font-size:12px;color:#aaa;line-height:1.55;margin:0 0 16px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.thumb{position:relative;aspect-ratio:3/4;background:#222;border-radius:8px;overflow:hidden}
+.thumb img{width:100%;height:100%;object-fit:cover}
+.thumb span{position:absolute;right:4px;bottom:4px;background:rgba(0,0,0,.7);padding:2px 4px;border-radius:4px;font-size:9px}
+.sheetActions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}
+.sheetActions button{border:0;border-radius:12px;padding:13px;font-weight:700}
+.export{background:#fff;color:#000}
+.close{background:#222;color:#fff}
+.danger{margin-top:8px;width:100%;border:1px solid #5b2828!important;background:#1d1111!important;color:#ff9d9d!important}
+
+.start{
+  position:absolute;z-index:50;inset:0;background:#050505;
+  display:flex;align-items:center;justify-content:center;padding:24px;
+}
+.start.hidden{display:none}
+.startCard{width:min(100%,420px)}
+.logo{font-size:32px;font-weight:800;letter-spacing:.12em;margin-bottom:6px}
+.kicker{font-size:11px;color:#888;letter-spacing:.12em;margin-bottom:28px}
+.start h1{font-size:20px;line-height:1.35;margin:0 0 12px}
+.start p{color:#aaa;font-size:13px;line-height:1.6}
+.start button{
+  width:100%;border:0;border-radius:14px;background:#fff;color:#000;
+  padding:15px;font-weight:800;margin-top:14px
+}
+.note{font-size:10px!important;color:#666!important;margin-top:14px!important}
+#error{color:#ff9d9d;font-size:11px;margin-top:10px;white-space:pre-wrap}
+
+.toast{
+  position:absolute;z-index:60;left:50%;top:calc(20px + env(safe-area-inset-top));
+  transform:translateX(-50%);background:rgba(0,0,0,.82);color:#fff;border:1px solid var(--line);
+  border-radius:999px;padding:9px 14px;font-size:11px;opacity:0;pointer-events:none;
+  transition:.2s
+}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div id="app">
+  <video id="video" autoplay playsinline muted></video>
+  <div id="flash"></div>
+
+  <div class="topbar">
+    <div>
+      <div class="brand">3D SCANNER</div>
+      <div class="sub">48 VIEW CAPTURE</div>
+    </div>
+    <div class="status">
+      PHOTOS
+      <b><span id="count">00</span> / 48</b>
+    </div>
+  </div>
+
+  <div class="overlay">
+    <div id="ring" class="ring"></div>
+    <div class="target"></div>
+    <div class="guide" id="guide">
+      KEEP THE OBJECT INSIDE THE CIRCLE
+      <span>対象物を中央に保ったまま、ゆっくり一周してください</span>
+    </div>
+    <div class="headingBadge">
+      ANGLE&nbsp; <b id="heading">--°</b>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="modeRow">
+      <button class="pill active" id="manualBtn">MANUAL</button>
+      <button class="pill" id="autoBtn">AUTO ANGLE</button>
+    </div>
+    <div class="mainRow">
+      <button class="smallBtn" id="galleryBtn">CAPTURES<br><b id="galleryCount">0</b></button>
+      <div class="captureWrap"><button class="capture" id="captureBtn" aria-label="capture"></button></div>
+      <button class="smallBtn" id="switchBtn">CAMERA<br>SWITCH</button>
+    </div>
+    <div class="progressBox">
+      <div class="progressTrack"><div class="progressFill" id="progress"></div></div>
+      <div class="progressText" id="progressText">0% COMPLETE</div>
+    </div>
+  </div>
+
+  <div class="sheet" id="sheet">
+    <div class="sheetCard">
+      <h2>Captured Views</h2>
+      <p>48枚をZIPで書き出すと、各JPEGと撮影角度を記録した manifest.json が保存されます。</p>
+      <div class="grid" id="thumbGrid"></div>
+      <div class="sheetActions">
+        <button class="export" id="exportBtn">EXPORT ZIP</button>
+        <button class="close" id="closeSheet">CLOSE</button>
+      </div>
+      <button class="danger" id="resetBtn">RESET ALL CAPTURES</button>
+    </div>
+  </div>
+
+  <div class="start" id="start">
+    <div class="startCard">
+      <div class="logo">3D SCANNER</div>
+      <div class="kicker">OBJECT CAPTURE / 48 VIEWS</div>
+      <h1>対象物の周囲を一周して、48方向から撮影します。</h1>
+      <p>
+        明るく均一な場所で、対象物が画面中央から外れないようにしてください。
+        AUTO ANGLEでは端末の向きを使って約7.5°ごとに撮影します。
+      </p>
+      <button id="startBtn">START CAMERA</button>
+      <div id="error"></div>
+      <p class="note">カメラと端末センサーの利用にはHTTPS環境とブラウザの許可が必要です。</p>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<canvas id="canvas" hidden></canvas>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script>
+(() => {
+  const TOTAL = 48;
+  const STEP = 360 / TOTAL;
+
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const start = document.getElementById('start');
+  const startBtn = document.getElementById('startBtn');
+  const errorBox = document.getElementById('error');
+  const captureBtn = document.getElementById('captureBtn');
+  const switchBtn = document.getElementById('switchBtn');
+  const manualBtn = document.getElementById('manualBtn');
+  const autoBtn = document.getElementById('autoBtn');
+  const countEl = document.getElementById('count');
+  const galleryCount = document.getElementById('galleryCount');
+  const progress = document.getElementById('progress');
+  const progressText = document.getElementById('progressText');
+  const ring = document.getElementById('ring');
+  const headingEl = document.getElementById('heading');
+  const guide = document.getElementById('guide');
+  const flash = document.getElementById('flash');
+  const sheet = document.getElementById('sheet');
+  const galleryBtn = document.getElementById('galleryBtn');
+  const closeSheet = document.getElementById('closeSheet');
+  const thumbGrid = document.getElementById('thumbGrid');
+  const exportBtn = document.getElementById('exportBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const toast = document.getElementById('toast');
+
+  let stream = null;
+  let facing = 'environment';
+  let captures = [];
+  let mode = 'manual';
+  let heading = null;
+  let startHeading = null;
+  let lastAutoIndex = -1;
+  let autoBusy = false;
+  let sensorReady = false;
+  let headingFiltered = null;
+
+  function toastMsg(msg){
+    toast.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => toast.classList.remove('show'), 1700);
+  }
+
+  function circularDiff(a,b){
+    let d = (a - b + 540) % 360 - 180;
+    return d;
+  }
+
+  function circularDistance(a,b){
+    return Math.abs(circularDiff(a,b));
+  }
+
+  function lerpAngle(current, target, amount){
+    let d = circularDiff(target, current);
+    return (current + d * amount + 360) % 360;
+  }
+
+  function buildRing(){
+    ring.innerHTML = '';
+    for(let i=0;i<TOTAL;i++){
+      const d = document.createElement('div');
+      d.className = 'dot';
+      const r = Math.min(window.innerWidth * .44, 225);
+      const a = (i / TOTAL) * Math.PI * 2 - Math.PI/2;
+      const x = Math.cos(a) * r;
+      const y = Math.sin(a) * r;
+      d.style.transform = `translate(${x}px, ${y}px)`;
+      ring.appendChild(d);
+    }
+    updateUI();
+  }
+
+  function updateUI(){
+    countEl.textContent = String(captures.length).padStart(2,'0');
+    galleryCount.textContent = captures.length;
+    const pct = Math.round(captures.length / TOTAL * 100);
+    progress.style.width = pct + '%';
+    progressText.textContent = pct + '% COMPLETE';
+
+    [...ring.children].forEach((d,i)=>{
+      d.classList.toggle('done', i < captures.length);
+      d.classList.toggle('next', i === captures.length && captures.length < TOTAL);
+    });
+
+    captureBtn.disabled = captures.length >= TOTAL;
+    if(captures.length >= TOTAL){
+      guide.innerHTML = 'CAPTURE COMPLETE<span>48方向の撮影が完了しました。ZIPを書き出してください</span>';
+      toastMsg('48 VIEWS COMPLETE');
+    } else if(mode === 'auto'){
+      guide.innerHTML = 'MOVE SLOWLY AROUND THE OBJECT<span>次の角度に到達すると自動撮影します</span>';
+    } else {
+      guide.innerHTML = 'KEEP THE OBJECT INSIDE THE CIRCLE<span>対象物を中央に保って撮影してください</span>';
+    }
+  }
+
+  async function startCamera(){
+    if(!navigator.mediaDevices?.getUserMedia){
+      throw new Error('このブラウザはカメラAPIに対応していません。');
+    }
+    if(stream) stream.getTracks().forEach(t => t.stop());
+
+    const constraints = {
+      audio:false,
+      video:{
+        facingMode:{ideal:facing},
+        width:{ideal:1920},
+        height:{ideal:1080}
+      }
+    };
+
+    stream = await navigator.mediaDevices.getUserMedia(constraints);
+    video.srcObject = stream;
+    await video.play();
+  }
+
+  async function requestOrientation(){
+    try{
+      if(typeof DeviceOrientationEvent === 'undefined') return false;
+
+      if(typeof DeviceOrientationEvent.requestPermission === 'function'){
+        let permission;
+        try{
+          permission = await DeviceOrientationEvent.requestPermission(true);
+        }catch(e){
+          permission = await DeviceOrientationEvent.requestPermission();
+        }
+        if(permission !== 'granted') return false;
+      }
+
+      window.addEventListener('deviceorientationabsolute', onOrientation, true);
+      window.addEventListener('deviceorientation', onOrientation, true);
+      sensorReady = true;
+      return true;
+    }catch(e){
+      console.warn(e);
+      return false;
+    }
+  }
+
+  function onOrientation(e){
+    let h = null;
+
+    // Safari/iOS
+    if(typeof e.webkitCompassHeading === 'number'){
+      h = e.webkitCompassHeading;
+    }else if(typeof e.alpha === 'number'){
+      // alpha direction is browser/device dependent; relative motion is enough for this app
+      h = (360 - e.alpha) % 360;
+    }
+
+    if(h == null || Number.isNaN(h)) return;
+    headingFiltered = headingFiltered == null ? h : lerpAngle(headingFiltered, h, 0.18);
+    heading = headingFiltered;
+    headingEl.textContent = Math.round(heading) + '°';
+
+    if(mode === 'auto') handleAutoCapture();
+  }
+
+  async function capture(){
+    if(captures.length >= TOTAL || !video.videoWidth) return;
+    const w = video.videoWidth;
+    const h = video.videoHeight;
+    canvas.width = w;
+    canvas.height = h;
+
+    // Mirror only when front camera is selected.
+    if(facing === 'user'){
+      ctx.save();
+      ctx.translate(w,0);
+      ctx.scale(-1,1);
+      ctx.drawImage(video,0,0,w,h);
+      ctx.restore();
+    }else{
+      ctx.drawImage(video,0,0,w,h);
+    }
+
+    const blob = await new Promise(res => canvas.toBlob(res,'image/jpeg',0.92));
+    if(!blob) return;
+
+    const item = {
+      index: captures.length + 1,
+      blob,
+      heading: heading == null ? null : Number(heading.toFixed(2)),
+      timestamp: new Date().toISOString(),
+      width:w,
+      height:h
+    };
+    captures.push(item);
+
+    flash.classList.remove('on');
+    void flash.offsetWidth;
+    flash.classList.add('on');
+
+    updateUI();
+    renderThumbs();
+  }
+
+  function handleAutoCapture(){
+    if(!sensorReady || heading == null || captures.length >= TOTAL || autoBusy) return;
+
+    if(startHeading == null){
+      startHeading = heading;
+      lastAutoIndex = -1;
+    }
+
+    let delta = (heading - startHeading + 360) % 360;
+    // If heading direction is opposite, use circular travel either way.
+    let index = Math.round(delta / STEP);
+
+    // Browser sensors can be noisy. Only capture when reaching a new step
+    // and sufficiently separated from the previous capture heading.
+    if(captures.length === 0){
+      autoBusy = true;
+      capture().finally(()=>setTimeout(()=>autoBusy=false,500));
+      lastAutoIndex = 0;
+      return;
+    }
+
+    const prevH = captures[captures.length-1].heading;
+    if(prevH == null) return;
+
+    if(circularDistance(heading, prevH) >= STEP * 0.78){
+      autoBusy = true;
+      capture().finally(()=>setTimeout(()=>autoBusy=false,550));
+      lastAutoIndex = index;
+    }
+  }
+
+  async function setMode(next){
+    mode = next;
+    manualBtn.classList.toggle('active',mode==='manual');
+    autoBtn.classList.toggle('active',mode==='auto');
+
+    if(mode === 'auto'){
+      const ok = sensorReady || await requestOrientation();
+      if(!ok){
+        mode='manual';
+        manualBtn.classList.add('active');
+        autoBtn.classList.remove('active');
+        toastMsg('ORIENTATION SENSOR NOT AVAILABLE');
+      }else{
+        startHeading = heading;
+        lastAutoIndex = -1;
+        toastMsg('AUTO ANGLE ON');
+      }
+    }
+    updateUI();
+  }
+
+  function renderThumbs(){
+    thumbGrid.innerHTML = '';
+    captures.forEach(c=>{
+      const div = document.createElement('div');
+      div.className='thumb';
+      const img = document.createElement('img');
+      img.src = URL.createObjectURL(c.blob);
+      img.onload = () => URL.revokeObjectURL(img.src);
+      const s = document.createElement('span');
+      s.textContent = String(c.index).padStart(2,'0');
+      div.append(img,s);
+      thumbGrid.appendChild(div);
+    });
+  }
+
+  async function exportZip(){
+    if(!captures.length){
+      toastMsg('NO CAPTURES');
+      return;
+    }
+    if(typeof JSZip === 'undefined'){
+      toastMsg('ZIP LIBRARY NOT LOADED');
+      return;
+    }
+
+    exportBtn.disabled = true;
+    exportBtn.textContent = 'BUILDING ZIP...';
+
+    try{
+      const zip = new JSZip();
+      const imgFolder = zip.folder('images');
+      captures.forEach(c=>{
+        imgFolder.file(`view_${String(c.index).padStart(2,'0')}.jpg`, c.blob);
+      });
+
+      const manifest = {
+        app:'3D SCANNER — 48 View Capture',
+        version:1,
+        createdAt:new Date().toISOString(),
+        totalExpected:TOTAL,
+        totalCaptured:captures.length,
+        stepDegrees:STEP,
+        notes:[
+          'Headings are device/browser sensor readings and are intended as capture guidance metadata.',
+          'For photogrammetry, image overlap, lighting, texture and focus quality strongly affect reconstruction.'
+        ],
+        captures:captures.map(c=>({
+          index:c.index,
+          file:`images/view_${String(c.index).padStart(2,'0')}.jpg`,
+          heading:c.heading,
+          timestamp:c.timestamp,
+          width:c.width,
+          height:c.height
+        }))
+      };
+      zip.file('manifest.json', JSON.stringify(manifest,null,2));
+
+      const blob = await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
+      const a = document.createElement('a');
+      const stamp = new Date().toISOString().replace(/[:.]/g,'-');
+      a.href = URL.createObjectURL(blob);
+      a.download = `3D_SCANNER_${stamp}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(()=>{
+        URL.revokeObjectURL(a.href);
+        a.remove();
+      },1000);
+      toastMsg('ZIP EXPORTED');
+    }catch(e){
+      console.error(e);
+      toastMsg('EXPORT FAILED');
+    }finally{
+      exportBtn.disabled = false;
+      exportBtn.textContent = 'EXPORT ZIP';
+    }
+  }
+
+  startBtn.addEventListener('click', async ()=>{
+    errorBox.textContent='';
+    try{
+      await startCamera();
+      // Important: permission request is also made from the same user gesture.
+      await requestOrientation();
+      start.classList.add('hidden');
+      buildRing();
+    }catch(e){
+      console.error(e);
+      errorBox.textContent = 'カメラを起動できません。\n' + (e.message || e.name || e);
+    }
+  });
+
+  captureBtn.addEventListener('click', capture);
+  switchBtn.addEventListener('click', async ()=>{
+    facing = facing === 'environment' ? 'user' : 'environment';
+    try{
+      await startCamera();
+      toastMsg(facing === 'environment' ? 'REAR CAMERA' : 'FRONT CAMERA');
+    }catch(e){
+      console.error(e);
+      facing = facing === 'environment' ? 'user' : 'environment';
+      toastMsg('CAMERA SWITCH FAILED');
+    }
+  });
+
+  manualBtn.addEventListener('click',()=>setMode('manual'));
+  autoBtn.addEventListener('click',()=>setMode('auto'));
+  galleryBtn.addEventListener('click',()=>{ renderThumbs(); sheet.classList.add('open'); });
+  closeSheet.addEventListener('click',()=>sheet.classList.remove('open'));
+  exportBtn.addEventListener('click', exportZip);
+  resetBtn.addEventListener('click',()=>{
+    if(!confirm('48方向の撮影データをすべて削除しますか？')) return;
+    captures = [];
+    startHeading = heading;
+    lastAutoIndex = -1;
+    renderThumbs();
+    updateUI();
+    sheet.classList.remove('open');
+    toastMsg('RESET');
+  });
+
+  window.addEventListener('resize',buildRing);
+  buildRing();
+})();
+</script>
+</body>
+</html>
