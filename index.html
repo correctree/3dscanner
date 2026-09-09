@@ -1,817 +1,197 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
-<meta name="theme-color" content="#050505" />
-<title>3D SCANNER — 2-Ring 48 View Capture</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>3D SCANNER — STEP 4</title>
 <style>
-:root{
-  --bg:#050505; --fg:#f5f5f5; --muted:#9b9b9b;
-  --line:rgba(255,255,255,.22); --panel:rgba(0,0,0,.58);
-  --ok:#9cffad; --warn:#ffd36b; --bad:#ff7a7a;
-}
+:root{--bg:#070707;--fg:#fff;--muted:#999;--line:#2a2a2a;--panel:#111}
 *{box-sizing:border-box}
-html,body{margin:0;width:100%;height:100%;background:var(--bg);color:var(--fg);font-family:Arial,Helvetica,sans-serif;overflow:hidden}
-button{font:inherit}
-#app{position:fixed;inset:0;background:#000}
-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#111}
-#flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:30}
-#flash.on{animation:flash .18s ease-out}
-@keyframes flash{0%{opacity:.85}100%{opacity:0}}
-
-.topbar{
-  position:absolute;top:0;left:0;right:0;z-index:20;
-  padding:calc(14px + env(safe-area-inset-top)) 16px 12px;
-  display:flex;justify-content:space-between;align-items:flex-start;
-  background:linear-gradient(to bottom,rgba(0,0,0,.82),rgba(0,0,0,0));
-  pointer-events:none
-}
-.brand{font-size:13px;font-weight:700;letter-spacing:.16em}
-.sub{font-size:10px;color:#bbb;margin-top:3px;letter-spacing:.08em}
-.status{text-align:right;font-size:10px;letter-spacing:.08em;color:#bbb}
-.status b{display:block;color:#fff;font-size:18px;letter-spacing:0}
-
-.overlay{position:absolute;inset:0;z-index:10;pointer-events:none}
-.target{
-  position:absolute;left:50%;top:45%;transform:translate(-50%,-50%);
-  width:min(66vw,340px);aspect-ratio:1/1;border:1px solid rgba(255,255,255,.68);
-  border-radius:50%;box-shadow:0 0 0 9999px rgba(0,0,0,.10)
-}
-.target:before,.target:after{
-  content:"";position:absolute;left:50%;top:50%;background:rgba(255,255,255,.4);
-  transform:translate(-50%,-50%)
-}
-.target:before{width:28px;height:1px}.target:after{width:1px;height:28px}
-
-.ring{
-  position:absolute;left:50%;top:45%;transform:translate(-50%,-50%);
-  width:min(90vw,460px);aspect-ratio:1/1
-}
-.dot{
-  position:absolute;left:50%;top:50%;border-radius:50%;
-  background:rgba(255,255,255,.18)
-}
-.dot.low{width:6px;height:6px;margin:-3px}
-.dot.high{width:5px;height:5px;margin:-2.5px;border:1px solid rgba(255,255,255,.28);background:transparent}
-.dot.done{background:#fff;border-color:#fff;box-shadow:0 0 7px rgba(255,255,255,.75)}
-.dot.next{width:11px!important;height:11px!important;margin:-5.5px!important;background:#fff;border-color:#fff;box-shadow:0 0 14px rgba(255,255,255,1)}
-
-.guide{
-  position:absolute;left:50%;top:calc(45% + min(49vw,238px));
-  transform:translate(-50%,10px);width:92%;text-align:center;
-  font-weight:700;font-size:12px;letter-spacing:.10em;text-shadow:0 1px 4px #000
-}
-.guide span{display:block;color:#c6c6c6;font-size:10px;font-weight:400;margin-top:5px;letter-spacing:.04em;line-height:1.45}
-
-.hud{
-  position:absolute;left:12px;right:12px;top:calc(62px + env(safe-area-inset-top));
-  display:grid;grid-template-columns:repeat(4,1fr);gap:6px;pointer-events:none
-}
-.hudCard{
-  padding:7px 8px;border:1px solid var(--line);border-radius:10px;background:var(--panel);
-  backdrop-filter:blur(9px);min-width:0
-}
-.hudCard small{display:block;font-size:8px;color:#9b9b9b;letter-spacing:.08em;white-space:nowrap}
-.hudCard b{display:block;margin-top:2px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ok{color:var(--ok)!important}.warn{color:var(--warn)!important}.bad{color:var(--bad)!important}
-
-.stagePanel{
-  position:absolute;left:50%;top:calc(45% - min(35vw,170px));
-  transform:translate(-50%,-100%);background:rgba(0,0,0,.52);border:1px solid var(--line);
-  border-radius:999px;padding:7px 11px;font-size:9px;letter-spacing:.09em;white-space:nowrap
-}
-.stagePanel b{color:#fff}
-
-.controls{
-  position:absolute;z-index:25;left:0;right:0;bottom:0;
-  padding:12px 14px calc(16px + env(safe-area-inset-bottom));
-  background:linear-gradient(to top,rgba(0,0,0,.94),rgba(0,0,0,.45),rgba(0,0,0,0))
-}
-.modeRow{display:flex;gap:8px;justify-content:center;margin-bottom:10px}
-.pill{
-  border:1px solid var(--line);background:rgba(0,0,0,.48);color:#ddd;
-  padding:8px 11px;border-radius:999px;font-size:10px;letter-spacing:.05em
-}
-.pill.active{background:#fff;color:#000;border-color:#fff}
-.mainRow{display:grid;grid-template-columns:1fr 92px 1fr;align-items:center;gap:12px}
-.smallBtn{
-  border:1px solid var(--line);background:rgba(0,0,0,.5);color:#fff;
-  border-radius:14px;padding:12px 8px;font-size:11px
-}
-.captureWrap{display:flex;justify-content:center}
-.capture{
-  width:78px;height:78px;border-radius:50%;border:4px solid white;background:transparent;
-  padding:6px;display:grid;place-items:center
-}
-.capture:after{content:"";display:block;width:58px;height:58px;border-radius:50%;background:#fff}
-.capture:active:after{transform:scale(.88)}
-.capture:disabled{opacity:.35}.capture:disabled:after{background:#777}
-
-.progressBox{
-  margin-top:10px;border-top:1px solid rgba(255,255,255,.14);padding-top:9px;
-  display:flex;align-items:center;gap:10px
-}
-.progressTrack{height:3px;background:rgba(255,255,255,.15);flex:1;border-radius:99px;overflow:hidden}
-.progressFill{height:100%;background:#fff;width:0%}
-.progressText{font-size:10px;color:#bbb;min-width:82px;text-align:right}
-
-.sheet{
-  position:absolute;z-index:40;inset:0;background:rgba(0,0,0,.86);
-  display:none;align-items:flex-end
-}
-.sheet.open{display:flex}
-.sheetCard{
-  width:100%;max-height:88vh;overflow:auto;background:#101010;border-radius:22px 22px 0 0;
-  padding:20px 16px calc(24px + env(safe-area-inset-bottom))
-}
-.sheet h2{font-size:18px;margin:0 0 6px}
-.sheet p{font-size:12px;color:#aaa;line-height:1.55;margin:0 0 16px}
-.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-.thumb{position:relative;aspect-ratio:3/4;background:#222;border-radius:8px;overflow:hidden}
-.thumb img{width:100%;height:100%;object-fit:cover}
-.thumb span{position:absolute;right:4px;bottom:4px;background:rgba(0,0,0,.75);padding:2px 4px;border-radius:4px;font-size:9px}
-.thumb em{
-  position:absolute;left:4px;top:4px;background:rgba(0,0,0,.75);padding:2px 4px;
-  border-radius:4px;font-size:8px;font-style:normal
-}
-.sheetActions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}
-.sheetActions button{border:0;border-radius:12px;padding:13px;font-weight:700}
-.export{background:#fff;color:#000}.close{background:#222;color:#fff}
-.danger{margin-top:8px;width:100%;border:1px solid #5b2828!important;background:#1d1111!important;color:#ff9d9d!important}
-
-.start{
-  position:absolute;z-index:50;inset:0;background:#050505;display:flex;
-  align-items:center;justify-content:center;padding:24px
-}
-.start.hidden{display:none}
-.startCard{width:min(100%,430px)}
-.logo{font-size:32px;font-weight:800;letter-spacing:.12em;margin-bottom:6px}
-.kicker{font-size:11px;color:#888;letter-spacing:.12em;margin-bottom:26px}
-.start h1{font-size:20px;line-height:1.35;margin:0 0 12px}
-.start p{color:#aaa;font-size:13px;line-height:1.6}
-.start button{width:100%;border:0;border-radius:14px;background:#fff;color:#000;padding:15px;font-weight:800;margin-top:14px}
-.note{font-size:10px!important;color:#666!important;margin-top:14px!important}
-#error{color:#ff9d9d;font-size:11px;margin-top:10px;white-space:pre-wrap}
-
-.toast{
-  position:absolute;z-index:60;left:50%;top:calc(20px + env(safe-area-inset-top));
-  transform:translateX(-50%);background:rgba(0,0,0,.84);color:#fff;border:1px solid var(--line);
-  border-radius:999px;padding:9px 14px;font-size:11px;opacity:0;pointer-events:none;transition:.2s;
-  max-width:88%;text-align:center
-}
-.toast.show{opacity:1}
-
-.transition{
-  position:absolute;z-index:45;inset:0;background:rgba(0,0,0,.88);display:none;
-  align-items:center;justify-content:center;padding:28px;text-align:center
-}
-.transition.open{display:flex}
-.transitionCard{max-width:430px}
-.transition .big{font-size:54px;font-weight:800;letter-spacing:-.04em}
-.transition h2{font-size:20px;margin:6px 0 10px}
-.transition p{font-size:13px;color:#aaa;line-height:1.6}
-.transition button{border:0;background:#fff;color:#000;border-radius:14px;padding:14px 18px;font-weight:800;width:100%;margin-top:12px}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:Arial,Helvetica,sans-serif}
+main{max-width:760px;margin:auto;padding:24px 16px 60px}
+h1{font-size:28px;letter-spacing:.08em;margin:0 0 4px}.sub{color:#888;font-size:12px;letter-spacing:.12em;margin-bottom:28px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px;margin:12px 0}
+h2{font-size:16px;margin:0 0 8px}p{color:#aaa;line-height:1.6;font-size:13px}
+button,.fileLabel{display:inline-block;border:0;border-radius:12px;padding:13px 16px;font-weight:700;font-size:13px;cursor:pointer}
+.primary{background:#fff;color:#000}.secondary{background:#222;color:#fff;border:1px solid #333}
+input[type=file]{display:none}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+#fileName{font-size:12px;color:#aaa}
+.progress{height:6px;border-radius:999px;background:#222;overflow:hidden;margin:14px 0}.bar{height:100%;width:0;background:#fff;transition:.25s}
+.status{font-size:12px;color:#bbb;white-space:pre-wrap}
+#viewer{width:100%;aspect-ratio:1;background:#050505;border-radius:14px;overflow:hidden;border:1px solid #222}
+.hidden{display:none}
+.stage{display:grid;grid-template-columns:34px 1fr;gap:10px;margin:10px 0;align-items:start}
+.num{width:28px;height:28px;border-radius:50%;border:1px solid #444;display:grid;place-items:center;font-size:11px}
+.stage b{font-size:12px}.stage span{display:block;color:#777;font-size:11px;margin-top:2px}
+.ok{color:#9cffad}.bad{color:#ff8d8d}.warn{color:#ffd36b}
+a.download{display:inline-block;margin-top:10px;color:#fff;text-decoration:none;border-bottom:1px solid #777}
 </style>
 </head>
 <body>
-<div id="app">
-  <video id="video" autoplay playsinline muted></video>
-  <div id="flash"></div>
+<main>
+  <h1>3D SCANNER</h1>
+  <div class="sub">STEP 4 / PHOTOGRAMMETRY BUILD</div>
 
-  <div class="topbar">
-    <div>
-      <div class="brand">3D SCANNER</div>
-      <div class="sub">2-RING / 48 VIEW CAPTURE</div>
-    </div>
-    <div class="status">PHOTOS<b><span id="count">00</span> / 48</b></div>
-  </div>
-
-  <div class="overlay">
-    <div id="ring" class="ring"></div>
-    <div class="target"></div>
-
-    <div class="hud">
-      <div class="hudCard"><small>LIGHT</small><b id="lightState">--</b></div>
-      <div class="hudCard"><small>SHARPNESS</small><b id="sharpState">--</b></div>
-      <div class="hudCard"><small>CENTER</small><b id="centerState">--</b></div>
-      <div class="hudCard"><small>ANGLE</small><b id="heading">--°</b></div>
-    </div>
-
-    <div class="stagePanel" id="stagePanel">RING 1 <b>LOW / 0 OF 24</b></div>
-
-    <div class="guide" id="guide">
-      KEEP THE OBJECT INSIDE THE CIRCLE
-      <span>対象物を中央に保ったまま、ゆっくり一周してください</span>
+  <div class="card">
+    <h2>1. 撮影ZIPを読み込む</h2>
+    <p>STEP 2・3で書き出した <b>3D_SCANNER_2RING_....zip</b> を選択します。</p>
+    <div class="row">
+      <label class="fileLabel secondary" for="zipInput">SELECT ZIP</label>
+      <input id="zipInput" type="file" accept=".zip,application/zip">
+      <span id="fileName">未選択</span>
     </div>
   </div>
 
-  <div class="controls">
-    <div class="modeRow">
-      <button class="pill active" id="manualBtn">MANUAL</button>
-      <button class="pill" id="autoBtn">AUTO ANGLE</button>
-    </div>
-    <div class="mainRow">
-      <button class="smallBtn" id="galleryBtn">CAPTURES<br><b id="galleryCount">0</b></button>
-      <div class="captureWrap"><button class="capture" id="captureBtn" aria-label="capture"></button></div>
-      <button class="smallBtn" id="switchBtn">CAMERA<br>SWITCH</button>
-    </div>
-    <div class="progressBox">
-      <div class="progressTrack"><div class="progressFill" id="progress"></div></div>
-      <div class="progressText" id="progressText">0% COMPLETE</div>
-    </div>
-  </div>
+  <div class="card">
+    <h2>2. 3Dを生成</h2>
+    <p>PC/サーバー上のCOLMAPが48枚を解析し、SfM → MVS → メッシュ化を行います。</p>
+    <button id="buildBtn" class="primary" disabled>BUILD 3D</button>
+    <div class="progress"><div id="bar" class="bar"></div></div>
+    <div id="status" class="status">ZIPを選択してください。</div>
 
-  <div class="sheet" id="sheet">
-    <div class="sheetCard">
-      <h2>Captured Views</h2>
-      <p>LOW 24枚＋HIGH 24枚。ZIPにはJPEG、撮影リング、角度、品質スコアを記録した manifest.json が入ります。</p>
-      <div class="grid" id="thumbGrid"></div>
-      <div class="sheetActions">
-        <button class="export" id="exportBtn">EXPORT ZIP</button>
-        <button class="close" id="closeSheet">CLOSE</button>
-      </div>
-      <button class="danger" id="resetBtn">RESET ALL CAPTURES</button>
+    <div style="margin-top:16px">
+      <div class="stage"><div class="num">1</div><div><b>UPLOAD</b><span>撮影画像を送信</span></div></div>
+      <div class="stage"><div class="num">2</div><div><b>FEATURES + MATCHING</b><span>画像間の特徴点を対応付け</span></div></div>
+      <div class="stage"><div class="num">3</div><div><b>SPARSE 3D</b><span>カメラ姿勢と疎な3Dを推定</span></div></div>
+      <div class="stage"><div class="num">4</div><div><b>DENSE + MESH</b><span>密な点群と表面メッシュを生成</span></div></div>
+      <div class="stage"><div class="num">5</div><div><b>GLB</b><span>Web/XR向けモデルへ変換</span></div></div>
     </div>
   </div>
 
-  <div class="transition" id="transition">
-    <div class="transitionCard">
-      <div class="big">24 / 48</div>
-      <h2>RING 2 — HIGH ANGLE</h2>
-      <p>
-        1周目が完了しました。次はスマホを少し高い位置に上げ、
-        対象物をやや上から見下ろす角度にしてください。対象物の上面も写るようにして、もう一周します。
-      </p>
-      <button id="startHighBtn">START HIGH RING</button>
+  <div id="resultCard" class="card hidden">
+    <h2>3. 3D MODEL</h2>
+    <p id="resultText">モデルを読み込みます。</p>
+    <div id="viewer"></div>
+    <div class="row">
+      <a id="glbLink" class="download" href="#" download>DOWNLOAD GLB</a>
+      <a id="plyLink" class="download" href="#" download>DOWNLOAD PLY</a>
     </div>
   </div>
 
-  <div class="start" id="start">
-    <div class="startCard">
-      <div class="logo">3D SCANNER</div>
-      <div class="kicker">OBJECT CAPTURE / 2 RINGS / 48 VIEWS</div>
-      <h1>24方向 × 2段で、3D再構成用の写真を撮影します。</h1>
-      <p>
-        <b>RING 1</b>：対象物とほぼ同じ高さから24枚。<br>
-        <b>RING 2</b>：少し高い位置から24枚。<br><br>
-        明るさ・ブレ・中央ずれをリアルタイム判定し、AUTO ANGLEでは品質が低いと自動撮影を待機します。
-      </p>
-      <button id="startBtn">START CAMERA</button>
-      <div id="error"></div>
-      <p class="note">カメラと端末センサーの利用にはHTTPS環境とブラウザの許可が必要です。</p>
-    </div>
+  <div class="card">
+    <h2>接続先</h2>
+    <p>同じPCで動かす場合は <code>http://localhost:8000</code>。スマホから使う場合は、PCのLAN内IPまたはHTTPS公開URLを指定します。</p>
+    <input id="apiBase" value="http://localhost:8000" style="width:100%;background:#080808;color:#fff;border:1px solid #333;border-radius:10px;padding:12px">
   </div>
+</main>
 
-  <div class="toast" id="toast"></div>
-</div>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
+import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/controls/OrbitControls.js';
+import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/loaders/GLTFLoader.js';
 
-<canvas id="canvas" hidden></canvas>
-<canvas id="analysisCanvas" width="160" height="120" hidden></canvas>
+const zipInput=document.getElementById('zipInput');
+const fileName=document.getElementById('fileName');
+const buildBtn=document.getElementById('buildBtn');
+const bar=document.getElementById('bar');
+const status=document.getElementById('status');
+const resultCard=document.getElementById('resultCard');
+const glbLink=document.getElementById('glbLink');
+const plyLink=document.getElementById('plyLink');
+const resultText=document.getElementById('resultText');
+const apiBase=document.getElementById('apiBase');
 
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script>
-(() => {
-  const TOTAL = 48;
-  const PER_RING = 24;
-  const STEP = 360 / PER_RING;
+let file=null, pollTimer=null;
 
-  // Quality thresholds. These are intentionally conservative and work as
-  // capture guidance rather than semantic object recognition.
-  const MIN_BRIGHTNESS = 52;
-  const MAX_BRIGHTNESS = 222;
-  const MIN_SHARPNESS = 125;
-  const MAX_CENTER_OFFSET = 0.23;
+zipInput.onchange=()=>{
+  file=zipInput.files[0]||null;
+  fileName.textContent=file?file.name:'未選択';
+  buildBtn.disabled=!file;
+  status.textContent=file?'準備完了。BUILD 3Dを押してください。':'ZIPを選択してください。';
+};
 
-  const video = document.getElementById('video');
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d');
-  const analysisCanvas = document.getElementById('analysisCanvas');
-  const actx = analysisCanvas.getContext('2d', {willReadFrequently:true});
+function setProgress(p,msg){
+  bar.style.width=Math.max(0,Math.min(100,p))+'%';
+  status.textContent=msg;
+}
 
-  const start = document.getElementById('start');
-  const startBtn = document.getElementById('startBtn');
-  const errorBox = document.getElementById('error');
-  const captureBtn = document.getElementById('captureBtn');
-  const switchBtn = document.getElementById('switchBtn');
-  const manualBtn = document.getElementById('manualBtn');
-  const autoBtn = document.getElementById('autoBtn');
-  const countEl = document.getElementById('count');
-  const galleryCount = document.getElementById('galleryCount');
-  const progress = document.getElementById('progress');
-  const progressText = document.getElementById('progressText');
-  const ring = document.getElementById('ring');
-  const headingEl = document.getElementById('heading');
-  const guide = document.getElementById('guide');
-  const flash = document.getElementById('flash');
-  const sheet = document.getElementById('sheet');
-  const galleryBtn = document.getElementById('galleryBtn');
-  const closeSheet = document.getElementById('closeSheet');
-  const thumbGrid = document.getElementById('thumbGrid');
-  const exportBtn = document.getElementById('exportBtn');
-  const resetBtn = document.getElementById('resetBtn');
-  const toast = document.getElementById('toast');
-  const lightState = document.getElementById('lightState');
-  const sharpState = document.getElementById('sharpState');
-  const centerState = document.getElementById('centerState');
-  const stagePanel = document.getElementById('stagePanel');
-  const transition = document.getElementById('transition');
-  const startHighBtn = document.getElementById('startHighBtn');
-
-  let stream = null;
-  let facing = 'environment';
-  let captures = [];
-  let mode = 'manual';
-  let heading = null;
-  let headingFiltered = null;
-  let sensorReady = false;
-  let autoBusy = false;
-  let stage = 0; // 0 = LOW, 1 = HIGH
-  let stageStartHeading = null;
-  let lastAutoHeading = null;
-  let waitingForHighStart = false;
-
-  let quality = {
-    brightness:null,
-    sharpness:null,
-    centerOffset:null,
-    centerX:null,
-    centerY:null,
-    lightOK:false,
-    sharpOK:false,
-    centerOK:false,
-    overall:false
-  };
-
-  function toastMsg(msg){
-    toast.textContent = msg;
-    toast.classList.add('show');
-    clearTimeout(toast._t);
-    toast._t = setTimeout(() => toast.classList.remove('show'), 1700);
+buildBtn.onclick=async()=>{
+  if(!file)return;
+  buildBtn.disabled=true;
+  resultCard.classList.add('hidden');
+  setProgress(5,'UPLOAD...');
+  const fd=new FormData();
+  fd.append('file',file);
+  try{
+    const r=await fetch(apiBase.value.replace(/\/$/,'')+'/api/reconstruct',{method:'POST',body:fd});
+    if(!r.ok)throw new Error(await r.text());
+    const data=await r.json();
+    setProgress(10,'ジョブを開始しました: '+data.job_id);
+    poll(data.job_id);
+  }catch(e){
+    setProgress(0,'ERROR: '+e.message);
+    buildBtn.disabled=false;
   }
+};
 
-  function circularDiff(a,b){
-    return (a - b + 540) % 360 - 180;
-  }
-  function circularDistance(a,b){ return Math.abs(circularDiff(a,b)); }
-  function lerpAngle(current,target,amount){
-    const d = circularDiff(target,current);
-    return (current + d * amount + 360) % 360;
-  }
+async function poll(jobId){
+  clearTimeout(pollTimer);
+  try{
+    const base=apiBase.value.replace(/\/$/,'');
+    const r=await fetch(base+'/api/status/'+jobId);
+    if(!r.ok)throw new Error(await r.text());
+    const d=await r.json();
+    setProgress(d.progress||0,(d.stage||'PROCESSING')+'\n'+(d.message||''));
 
-  function setMetric(el, text, state){
-    el.textContent = text;
-    el.className = state;
-  }
-
-  function buildRing(){
-    ring.innerHTML = '';
-    const outer = Math.min(window.innerWidth * .43, 220);
-    const inner = outer * .89;
-
-    for(let i=0;i<PER_RING;i++){
-      const a = (i/PER_RING)*Math.PI*2 - Math.PI/2;
-
-      const low = document.createElement('div');
-      low.className = 'dot low';
-      low.dataset.stage='0'; low.dataset.index=i;
-      low.style.transform = `translate(${Math.cos(a)*inner}px, ${Math.sin(a)*inner}px)`;
-      ring.appendChild(low);
-
-      const high = document.createElement('div');
-      high.className = 'dot high';
-      high.dataset.stage='1'; high.dataset.index=i;
-      high.style.transform = `translate(${Math.cos(a)*outer}px, ${Math.sin(a)*outer}px)`;
-      ring.appendChild(high);
-    }
-    updateUI();
-  }
-
-  function capturesInStage(s){
-    return captures.filter(c=>c.stage===s).length;
-  }
-
-  function updateUI(){
-    const lowCount = capturesInStage(0);
-    const highCount = capturesInStage(1);
-    countEl.textContent = String(captures.length).padStart(2,'0');
-    galleryCount.textContent = captures.length;
-    const pct = Math.round(captures.length/TOTAL*100);
-    progress.style.width = pct+'%';
-    progressText.textContent = pct+'% COMPLETE';
-
-    [...ring.children].forEach(d=>{
-      const s = Number(d.dataset.stage), i = Number(d.dataset.index);
-      const doneCount = s===0 ? lowCount : highCount;
-      d.classList.toggle('done', i < doneCount);
-      d.classList.toggle('next', s===stage && i===doneCount && doneCount<PER_RING);
-    });
-
-    const current = stage===0 ? lowCount : highCount;
-    stagePanel.innerHTML = `RING ${stage+1} <b>${stage===0?'LOW':'HIGH'} / ${current} OF 24</b>`;
-
-    captureBtn.disabled = captures.length>=TOTAL || waitingForHighStart;
-
-    if(captures.length>=TOTAL){
-      guide.innerHTML = 'CAPTURE COMPLETE<span>LOW 24枚＋HIGH 24枚の撮影が完了しました。ZIPを書き出してください</span>';
-    } else if(waitingForHighStart){
-      guide.innerHTML = 'MOVE TO HIGH ANGLE<span>スマホを少し高くして、対象物の上面が見える位置へ移動してください</span>';
-    } else if(!quality.overall){
-      guide.innerHTML = 'ADJUST BEFORE CAPTURE<span>上の品質表示を確認してください。MANUALでは警告状態でも撮影できます</span>';
-    } else if(mode==='auto'){
-      guide.innerHTML = stage===0
-        ? 'MOVE SLOWLY — LOW RING<span>対象物とほぼ同じ高さで、ゆっくり一周してください</span>'
-        : 'MOVE SLOWLY — HIGH RING<span>やや上から見下ろす位置を保って、もう一周してください</span>';
-    } else {
-      guide.innerHTML = stage===0
-        ? 'RING 1 — LOW ANGLE<span>対象物とほぼ同じ高さから24方向を撮影します</span>'
-        : 'RING 2 — HIGH ANGLE<span>対象物の上面が見える高さから24方向を撮影します</span>';
-    }
-  }
-
-  async function startCamera(){
-    if(!navigator.mediaDevices?.getUserMedia){
-      throw new Error('このブラウザはカメラAPIに対応していません。');
-    }
-    if(stream) stream.getTracks().forEach(t=>t.stop());
-
-    stream = await navigator.mediaDevices.getUserMedia({
-      audio:false,
-      video:{
-        facingMode:{ideal:facing},
-        width:{ideal:1920},
-        height:{ideal:1080}
-      }
-    });
-    video.srcObject = stream;
-    await video.play();
-  }
-
-  async function requestOrientation(){
-    try{
-      if(typeof DeviceOrientationEvent==='undefined') return false;
-      if(typeof DeviceOrientationEvent.requestPermission==='function'){
-        let p;
-        try{ p = await DeviceOrientationEvent.requestPermission(true); }
-        catch(e){ p = await DeviceOrientationEvent.requestPermission(); }
-        if(p!=='granted') return false;
-      }
-      window.addEventListener('deviceorientationabsolute', onOrientation, true);
-      window.addEventListener('deviceorientation', onOrientation, true);
-      sensorReady = true;
-      return true;
-    }catch(e){
-      console.warn(e); return false;
-    }
-  }
-
-  function onOrientation(e){
-    let h = null;
-    if(typeof e.webkitCompassHeading==='number') h = e.webkitCompassHeading;
-    else if(typeof e.alpha==='number') h = (360-e.alpha)%360;
-    if(h==null || Number.isNaN(h)) return;
-
-    headingFiltered = headingFiltered==null ? h : lerpAngle(headingFiltered,h,.18);
-    heading = headingFiltered;
-    headingEl.textContent = Math.round(heading)+'°';
-
-    if(mode==='auto') handleAutoCapture();
-  }
-
-  function analyzeFrame(){
-    if(!video.videoWidth) return;
-
-    const W=analysisCanvas.width, H=analysisCanvas.height;
-    actx.drawImage(video,0,0,W,H);
-    const im = actx.getImageData(0,0,W,H);
-    const d = im.data;
-    const gray = new Float32Array(W*H);
-
-    let sum=0;
-    for(let i=0,p=0;i<d.length;i+=4,p++){
-      const g = .2126*d[i]+.7152*d[i+1]+.0722*d[i+2];
-      gray[p]=g; sum+=g;
-    }
-    const brightness = sum/(W*H);
-
-    // Laplacian variance: a lightweight sharpness / motion-blur proxy.
-    let lapSum=0, lapSq=0, lapN=0;
-
-    // Edge-weighted centroid: a lightweight centering cue.
-    let ew=0, ex=0, ey=0;
-
-    for(let y=1;y<H-1;y++){
-      for(let x=1;x<W-1;x++){
-        const p=y*W+x;
-        const lap = 4*gray[p]-gray[p-1]-gray[p+1]-gray[p-W]-gray[p+W];
-        lapSum+=lap; lapSq+=lap*lap; lapN++;
-
-        const gx = gray[p+1]-gray[p-1];
-        const gy = gray[p+W]-gray[p-W];
-        const mag = Math.sqrt(gx*gx+gy*gy);
-
-        // Ignore outer border so background edges have less influence.
-        if(x>W*.12 && x<W*.88 && y>H*.10 && y<H*.90 && mag>18){
-          ew+=mag; ex+=x*mag; ey+=y*mag;
-        }
-      }
-    }
-
-    const lapMean=lapSum/Math.max(1,lapN);
-    const sharpness=lapSq/Math.max(1,lapN)-lapMean*lapMean;
-
-    let cx=W/2, cy=H/2;
-    if(ew>0){ cx=ex/ew; cy=ey/ew; }
-
-    const dx=(cx-W/2)/(W/2);
-    const dy=(cy-H/2)/(H/2);
-    const centerOffset=Math.sqrt(dx*dx+dy*dy);
-
-    const lightOK = brightness>=MIN_BRIGHTNESS && brightness<=MAX_BRIGHTNESS;
-    const sharpOK = sharpness>=MIN_SHARPNESS;
-    const centerOK = centerOffset<=MAX_CENTER_OFFSET;
-
-    quality={
-      brightness:Number(brightness.toFixed(1)),
-      sharpness:Number(sharpness.toFixed(0)),
-      centerOffset:Number(centerOffset.toFixed(3)),
-      centerX:Number((cx/W).toFixed(3)),
-      centerY:Number((cy/H).toFixed(3)),
-      lightOK, sharpOK, centerOK,
-      overall:lightOK && sharpOK && centerOK
-    };
-
-    if(brightness<MIN_BRIGHTNESS) setMetric(lightState,'TOO DARK','bad');
-    else if(brightness>MAX_BRIGHTNESS) setMetric(lightState,'TOO BRIGHT','warn');
-    else setMetric(lightState,'GOOD','ok');
-
-    if(sharpOK) setMetric(sharpState,'GOOD','ok');
-    else setMetric(sharpState,'HOLD STILL','bad');
-
-    if(centerOK) setMetric(centerState,'GOOD','ok');
-    else setMetric(centerState,'RE-CENTER','warn');
-
-    updateUI();
-  }
-
-  async function capture({auto=false}={}){
-    if(captures.length>=TOTAL || !video.videoWidth || waitingForHighStart) return false;
-
-    if(auto && !quality.overall){
-      return false;
-    }
-
-    if(!auto && !quality.overall){
-      toastMsg('QUALITY WARNING — MANUAL CAPTURE SAVED');
-    }
-
-    const w=video.videoWidth, h=video.videoHeight;
-    canvas.width=w; canvas.height=h;
-
-    if(facing==='user'){
-      ctx.save(); ctx.translate(w,0); ctx.scale(-1,1); ctx.drawImage(video,0,0,w,h); ctx.restore();
-    }else{
-      ctx.drawImage(video,0,0,w,h);
-    }
-
-    const blob=await new Promise(res=>canvas.toBlob(res,'image/jpeg',.92));
-    if(!blob) return false;
-
-    const stageIndex = capturesInStage(stage)+1;
-    captures.push({
-      index:captures.length+1,
-      stage,
-      stageName:stage===0?'LOW':'HIGH',
-      stageIndex,
-      blob,
-      heading:heading==null?null:Number(heading.toFixed(2)),
-      quality:{...quality},
-      timestamp:new Date().toISOString(),
-      width:w,height:h
-    });
-
-    flash.classList.remove('on'); void flash.offsetWidth; flash.classList.add('on');
-    renderThumbs();
-    updateUI();
-
-    if(capturesInStage(0)>=PER_RING && stage===0){
-      waitingForHighStart=true;
-      transition.classList.add('open');
-      updateUI();
-    }else if(captures.length>=TOTAL){
-      toastMsg('48 VIEWS COMPLETE');
-    }
-    return true;
-  }
-
-  async function handleAutoCapture(){
-    if(!sensorReady || heading==null || captures.length>=TOTAL || autoBusy || waitingForHighStart) return;
-    if(!quality.overall) return;
-
-    const stageCount=capturesInStage(stage);
-
-    if(stageStartHeading==null){
-      stageStartHeading=heading;
-      lastAutoHeading=null;
-    }
-
-    if(stageCount===0 && lastAutoHeading==null){
-      autoBusy=true;
-      const ok=await capture({auto:true});
-      if(ok) lastAutoHeading=heading;
-      setTimeout(()=>autoBusy=false,600);
+    if(d.status==='done'){
+      setProgress(100,'COMPLETE');
+      buildBtn.disabled=false;
+      resultCard.classList.remove('hidden');
+      const glb=base+d.glb_url, ply=base+d.ply_url;
+      glbLink.href=glb; plyLink.href=ply;
+      resultText.textContent=`登録画像 ${d.registered_images||'-'} / 入力 ${d.input_images||'-'} 枚`;
+      loadModel(glb);
       return;
     }
-
-    if(lastAutoHeading!=null && circularDistance(heading,lastAutoHeading)>=STEP*.78){
-      autoBusy=true;
-      const ok=await capture({auto:true});
-      if(ok) lastAutoHeading=heading;
-      setTimeout(()=>autoBusy=false,600);
+    if(d.status==='error'){
+      buildBtn.disabled=false;
+      setProgress(d.progress||0,'ERROR\n'+(d.message||'再構成に失敗しました。'));
+      return;
     }
+    pollTimer=setTimeout(()=>poll(jobId),1800);
+  }catch(e){
+    buildBtn.disabled=false;
+    setProgress(0,'STATUS ERROR: '+e.message);
   }
+}
 
-  async function setMode(next){
-    mode=next;
-    manualBtn.classList.toggle('active',mode==='manual');
-    autoBtn.classList.toggle('active',mode==='auto');
-
-    if(mode==='auto'){
-      const ok=sensorReady || await requestOrientation();
-      if(!ok){
-        mode='manual';
-        manualBtn.classList.add('active');
-        autoBtn.classList.remove('active');
-        toastMsg('ORIENTATION SENSOR NOT AVAILABLE');
-      }else{
-        stageStartHeading=heading;
-        lastAutoHeading=null;
-        toastMsg('AUTO ANGLE ON');
-      }
-    }
-    updateUI();
+let renderer,scene,camera,controls,currentModel;
+function initViewer(){
+  const el=document.getElementById('viewer');
+  scene=new THREE.Scene();
+  camera=new THREE.PerspectiveCamera(45,1,.01,1000);
+  camera.position.set(2,1.5,2);
+  renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  el.innerHTML=''; el.appendChild(renderer.domElement);
+  controls=new OrbitControls(camera,renderer.domElement);
+  controls.enableDamping=true;
+  scene.add(new THREE.HemisphereLight(0xffffff,0x444444,2.5));
+  const d=new THREE.DirectionalLight(0xffffff,2); d.position.set(3,4,2); scene.add(d);
+  function resize(){
+    const w=el.clientWidth,h=el.clientHeight;
+    renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();
   }
+  new ResizeObserver(resize).observe(el); resize();
+  function loop(){requestAnimationFrame(loop);controls.update();renderer.render(scene,camera)} loop();
+}
+initViewer();
 
-  function renderThumbs(){
-    thumbGrid.innerHTML='';
-    captures.forEach(c=>{
-      const div=document.createElement('div'); div.className='thumb';
-      const img=document.createElement('img'); img.src=URL.createObjectURL(c.blob);
-      img.onload=()=>URL.revokeObjectURL(img.src);
-      const s=document.createElement('span'); s.textContent=String(c.index).padStart(2,'0');
-      const e=document.createElement('em');
-      e.textContent=(c.stageName==='LOW'?'L':'H')+c.stageIndex+(c.quality.overall?' ✓':' !');
-      div.append(img,e,s); thumbGrid.appendChild(div);
-    });
-  }
-
-  async function exportZip(){
-    if(!captures.length){toastMsg('NO CAPTURES');return;}
-    if(typeof JSZip==='undefined'){toastMsg('ZIP LIBRARY NOT LOADED');return;}
-
-    exportBtn.disabled=true; exportBtn.textContent='BUILDING ZIP...';
-    try{
-      const zip=new JSZip();
-      const lowFolder=zip.folder('images/low');
-      const highFolder=zip.folder('images/high');
-
-      captures.forEach(c=>{
-        const fn=`view_${String(c.stageIndex).padStart(2,'0')}.jpg`;
-        (c.stage===0?lowFolder:highFolder).file(fn,c.blob);
-      });
-
-      const manifest={
-        app:'3D SCANNER — 2-Ring 48 View Capture',
-        version:2,
-        createdAt:new Date().toISOString(),
-        capturePlan:{
-          total:TOTAL,
-          rings:[
-            {name:'LOW',count:24,description:'approximately object-height orbit'},
-            {name:'HIGH',count:24,description:'slightly elevated orbit looking down at the object'}
-          ],
-          nominalStepDegrees:STEP
-        },
-        qualityMethod:{
-          brightness:'mean luma',
-          sharpness:'Laplacian variance proxy',
-          centering:'edge-weighted centroid proxy',
-          note:'These are lightweight browser-side guidance metrics, not semantic object recognition.'
-        },
-        thresholds:{
-          minBrightness:MIN_BRIGHTNESS,
-          maxBrightness:MAX_BRIGHTNESS,
-          minSharpness:MIN_SHARPNESS,
-          maxCenterOffset:MAX_CENTER_OFFSET
-        },
-        captures:captures.map(c=>({
-          index:c.index,
-          ring:c.stageName,
-          ringIndex:c.stageIndex,
-          file:`images/${c.stageName.toLowerCase()}/view_${String(c.stageIndex).padStart(2,'0')}.jpg`,
-          heading:c.heading,
-          quality:c.quality,
-          timestamp:c.timestamp,
-          width:c.width,
-          height:c.height
-        }))
-      };
-      zip.file('manifest.json',JSON.stringify(manifest,null,2));
-
-      const readme =
-`3D SCANNER — 2-RING CAPTURE
-
-LOW:
-24 views captured approximately at object height.
-
-HIGH:
-24 views captured from a slightly elevated angle.
-
-For photogrammetry:
-- Keep the object stationary.
-- Keep lighting as constant as possible.
-- Avoid glossy, transparent, or textureless surfaces when possible.
-- The quality scores are capture guidance only.
-
-Files:
-images/low/*.jpg
-images/high/*.jpg
-manifest.json
-`;
-      zip.file('README.txt',readme);
-
-      const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
-      const a=document.createElement('a');
-      const stamp=new Date().toISOString().replace(/[:.]/g,'-');
-      a.href=URL.createObjectURL(blob);
-      a.download=`3D_SCANNER_2RING_${stamp}.zip`;
-      document.body.appendChild(a); a.click();
-      setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);
-      toastMsg('ZIP EXPORTED');
-    }catch(e){
-      console.error(e); toastMsg('EXPORT FAILED');
-    }finally{
-      exportBtn.disabled=false; exportBtn.textContent='EXPORT ZIP';
-    }
-  }
-
-  startBtn.addEventListener('click',async()=>{
-    errorBox.textContent='';
-    try{
-      await startCamera();
-      await requestOrientation();
-      start.classList.add('hidden');
-      buildRing();
-      setInterval(analyzeFrame,420);
-    }catch(e){
-      console.error(e);
-      errorBox.textContent='カメラを起動できません。\n'+(e.message||e.name||e);
-    }
-  });
-
-  captureBtn.addEventListener('click',()=>capture({auto:false}));
-
-  switchBtn.addEventListener('click',async()=>{
-    facing=facing==='environment'?'user':'environment';
-    try{
-      await startCamera();
-      toastMsg(facing==='environment'?'REAR CAMERA':'FRONT CAMERA');
-    }catch(e){
-      console.error(e);
-      facing=facing==='environment'?'user':'environment';
-      toastMsg('CAMERA SWITCH FAILED');
-    }
-  });
-
-  manualBtn.addEventListener('click',()=>setMode('manual'));
-  autoBtn.addEventListener('click',()=>setMode('auto'));
-
-  startHighBtn.addEventListener('click',()=>{
-    stage=1;
-    waitingForHighStart=false;
-    stageStartHeading=heading;
-    lastAutoHeading=null;
-    transition.classList.remove('open');
-    toastMsg('HIGH RING START');
-    updateUI();
-  });
-
-  galleryBtn.addEventListener('click',()=>{renderThumbs();sheet.classList.add('open');});
-  closeSheet.addEventListener('click',()=>sheet.classList.remove('open'));
-  exportBtn.addEventListener('click',exportZip);
-
-  resetBtn.addEventListener('click',()=>{
-    if(!confirm('撮影データをすべて削除しますか？')) return;
-    captures=[]; stage=0; waitingForHighStart=false;
-    stageStartHeading=heading; lastAutoHeading=null;
-    transition.classList.remove('open');
-    renderThumbs(); updateUI(); sheet.classList.remove('open');
-    toastMsg('RESET');
-  });
-
-  window.addEventListener('resize',buildRing);
-  buildRing();
-})();
+function loadModel(url){
+  if(currentModel){scene.remove(currentModel);currentModel=null}
+  new GLTFLoader().load(url,gltf=>{
+    currentModel=gltf.scene; scene.add(currentModel);
+    const box=new THREE.Box3().setFromObject(currentModel);
+    const size=box.getSize(new THREE.Vector3());
+    const center=box.getCenter(new THREE.Vector3());
+    currentModel.position.sub(center);
+    const m=Math.max(size.x,size.y,size.z)||1;
+    const scale=1.6/m;
+    currentModel.scale.setScalar(scale);
+    camera.position.set(2,1.4,2);controls.target.set(0,0,0);controls.update();
+  },undefined,e=>{resultText.textContent='GLB preview error: '+e.message});
+}
 </script>
 </body>
 </html>
