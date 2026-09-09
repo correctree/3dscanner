@@ -14,7 +14,15 @@ h1{font-size:28px;letter-spacing:.08em;margin:0 0 4px}.sub{color:#888;font-size:
 h2{font-size:16px;margin:0 0 8px}p{color:#aaa;line-height:1.6;font-size:13px}
 button,.fileLabel{display:inline-block;border:0;border-radius:12px;padding:13px 16px;font-weight:700;font-size:13px;cursor:pointer}
 .primary{background:#fff;color:#000}.secondary{background:#222;color:#fff;border:1px solid #333}
-input[type=file]{display:none}
+input[type=file]{
+  display:block;width:100%;margin-top:10px;
+  background:#0a0a0a;color:#ddd;border:1px solid #333;border-radius:12px;
+  padding:10px;font-size:13px
+}
+input[type=file]::file-selector-button{
+  border:0;border-radius:10px;padding:10px 12px;margin-right:10px;
+  background:#fff;color:#000;font-weight:700
+}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 #fileName{font-size:12px;color:#aaa}
 .progress{height:6px;border-radius:999px;background:#222;overflow:hidden;margin:14px 0}.bar{height:100%;width:0;background:#fff;transition:.25s}
@@ -36,11 +44,13 @@ a.download{display:inline-block;margin-top:10px;color:#fff;text-decoration:none;
   <div class="card">
     <h2>1. 撮影ZIPを読み込む</h2>
     <p>STEP 2・3で書き出した <b>3D_SCANNER_2RING_....zip</b> を選択します。</p>
-    <div class="row">
-      <label class="fileLabel secondary" for="zipInput">SELECT ZIP</label>
-      <input id="zipInput" type="file" accept=".zip,application/zip">
+    <input id="zipInput" type="file" accept=".zip,application/zip,application/x-zip-compressed,application/octet-stream">
+    <div class="row" style="margin-top:8px">
       <span id="fileName">未選択</span>
     </div>
+    <p id="zipHelp" style="margin-top:8px;font-size:11px;color:#777">
+      iPhone: 「ファイル」アプリ内の Downloads / iCloud Drive からZIPを選択してください。
+    </p>
   </div>
 
   <div class="card">
@@ -94,12 +104,34 @@ const apiBase=document.getElementById('apiBase');
 
 let file=null, pollTimer=null;
 
-zipInput.onchange=()=>{
-  file=zipInput.files[0]||null;
-  fileName.textContent=file?file.name:'未選択';
-  buildBtn.disabled=!file;
-  status.textContent=file?'準備完了。BUILD 3Dを押してください。':'ZIPを選択してください。';
-};
+function handleZipSelection(){
+  const files = zipInput.files;
+  file = files && files.length ? files[0] : null;
+
+  if(!file){
+    fileName.textContent='未選択';
+    buildBtn.disabled=true;
+    status.textContent='ZIPを選択してください。';
+    return;
+  }
+
+  const name = file.name || '';
+  const isZip = /\.zip$/i.test(name);
+
+  fileName.textContent = `${name}  (${Math.max(1,Math.round(file.size/1024/1024*10)/10)} MB)`;
+
+  if(!isZip){
+    buildBtn.disabled=true;
+    status.textContent='ZIPファイルを選択してください。\n選択ファイル: '+name;
+    return;
+  }
+
+  buildBtn.disabled=false;
+  status.textContent='ZIPを読み込みました。\nBUILD 3Dを押してください。';
+}
+
+zipInput.addEventListener('change', handleZipSelection);
+zipInput.addEventListener('input', handleZipSelection);
 
 function setProgress(p,msg){
   bar.style.width=Math.max(0,Math.min(100,p))+'%';
@@ -192,6 +224,13 @@ function loadModel(url){
     camera.position.set(2,1.4,2);controls.target.set(0,0,0);controls.update();
   },undefined,e=>{resultText.textContent='GLB preview error: '+e.message});
 }
+
+window.addEventListener('load',()=>{
+  if(location.protocol==='file:'){
+    status.textContent='ZIPは選択できますが、BUILD 3DでAPI接続するにはHTTP/HTTPSでこのページを開く必要があります。';
+  }
+});
+
 </script>
 </body>
 </html>
